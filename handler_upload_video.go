@@ -115,6 +115,14 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	videoURL := fmt.Sprintf("https://%s.s3.%s.amazonawws.com/%s", cfg.s3Bucket, cfg.s3Region, fileString)
 
+	videoMetaData.VideoURL = &videoURL
+	err = cfg.db.UpdateVideo(videoMetaData)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable to update the video data", err)
+		return
+	}
 
+	respondWithJSON(w, http.StatusOK, videoMetaData)
 }

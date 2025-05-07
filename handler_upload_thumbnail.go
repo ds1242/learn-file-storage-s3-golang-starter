@@ -37,7 +37,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
 	// TODO: implement the upload here
@@ -61,13 +60,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	videoData, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "unable to find the video", err)
-		return 
+		return
 	}
 	if videoData.UserID != userID {
 		respondWithError(w, http.StatusUnauthorized, "unauthorized", err)
 		return
 	}
-	
+
 	mediaType, _, err := mime.ParseMediaType(headerContentType)
 	if mediaType != "image/jpeg" && mediaType != "image/png" {
 		respondWithError(w, http.StatusBadRequest, "incorrect file type", fmt.Errorf("incorrect file type"))
@@ -84,17 +83,17 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "error", err)
 		return
 	}
-	
+
 	fileString := base64.RawURLEncoding.EncodeToString(key) + "."
 
 	fileType := strings.Split(mediaType, "/")
 	if len(fileType) > 1 {
-		fileString +=  fileType[1]
+		fileString += fileType[1]
 	} else {
 		respondWithError(w, http.StatusBadRequest, "invalid file type", fmt.Errorf("invalid file type"))
 		return
 	}
-	
+
 	filePath := filepath.Join(cfg.assetsRoot, fileString)
 
 	file, err := os.Create(filePath)
@@ -113,7 +112,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	err = cfg.db.UpdateVideo(videoData)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "unable to update the video data", err)
-		return 
+		return
 	}
 
 	respondWithJSON(w, http.StatusOK, videoData)

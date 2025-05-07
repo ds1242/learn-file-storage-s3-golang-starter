@@ -41,20 +41,35 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	thumbnail, header, err := r.FormFile("thumbnail")
+	thumbnailFile, header, err := r.FormFile("thumbnail")
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldn't find thumbnail", err)
 		return
 	}
 	headerContentType := header.Header.Get("Content-Type")
 
-	b, err := io.ReadAll(thumbnail)
+	b, err := io.ReadAll(thumbnailFile)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldn't read thumbnail", err)
 		return
 	}
 
-	cfg.db.GetVideo(userID)
+	videoData, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable to find the video", err)
+		return 
+	}
+	if videoData.UserID != userID {
+		respondWithError(w, http.StatusUnauthorized, "unauthorized", err)
+		return
+	}
+
+	thumbnailData := thumbnail{
+		data: b,
+		mediaType: headerContentType,
+	}
+
+	videoThumbnails[videoID] = thumbnailData
 
 	respondWithJSON(w, http.StatusOK, struct{}{})
 }

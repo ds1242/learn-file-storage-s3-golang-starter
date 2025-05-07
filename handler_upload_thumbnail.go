@@ -58,12 +58,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// b, err := io.ReadAll(thumbnailFile)
-	// if err != nil {
-	// 	respondWithError(w, http.StatusBadRequest, "Couldn't read thumbnail", err)
-	// 	return
-	// }
-
 	videoData, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "unable to find the video", err)

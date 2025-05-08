@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"encoding/json"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -20,6 +21,16 @@ import (
 )
 
 const maxVideoMemory int64 = 1 << 30
+
+type FFProbeOutput struct {
+	Streams []Stream `json:"streams"`
+}
+
+type Stream struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+	// Other fields you might need
+}
 
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
@@ -66,7 +77,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusBadRequest, "Invalid content type", err)
 		return
 	}
-	
+
 	if mediaType != "video/mp4" {
 		respondWithError(w, http.StatusUnsupportedMediaType, "File must be an MP4 video", nil)
 		return
@@ -105,10 +116,10 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_, err = cfg.s3Client.PutObject(context.Background(), &s3.PutObjectInput {
-		Bucket: aws.String(cfg.s3Bucket),
-		Key: aws.String(fileString),
-		Body: tempFile,
+	_, err = cfg.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:      aws.String(cfg.s3Bucket),
+		Key:         aws.String(fileString),
+		Body:        tempFile,
 		ContentType: aws.String("video/mp4"),
 	})
 
@@ -129,15 +140,27 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	respondWithJSON(w, http.StatusOK, videoMetaData)
 }
 
-
 func getVideoAspectRatio(filePath string) (string, error) {
-    cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
-	
-    var b bytes.Buffer
+	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
+
+	var b bytes.Buffer
 
 	cmd.Stdout = &b
 	err := cmd.Run()
 	if err != nil {
 		return "", err
 	}
+
+	var output FFProbeOutput
+	if err := json.Unmarshal(b.Bytes(), &output); err != nil {
+		return "", fmt.Errorf("error unmarshaling JSON: %w", err)
+	}
+
+	if len(output.Streams) == 0 {
+		return "", fmt.Errorf("no streams found in the video")
+	}
+	
+	width := output.Streams[0].Width
+	height := output.Streams[0].Height
+
 }

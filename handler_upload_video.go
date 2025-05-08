@@ -1,14 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"os"
-	"crypto/rand"
-	"encoding/base64"
+	"os/exec"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -125,4 +127,17 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	respondWithJSON(w, http.StatusOK, videoMetaData)
+}
+
+
+func getVideoAspectRatio(filePath string) (string, error) {
+    cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
+	
+    var b bytes.Buffer
+
+	cmd.Stdout = &b
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
 }

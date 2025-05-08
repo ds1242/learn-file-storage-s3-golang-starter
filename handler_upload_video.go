@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -12,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"encoding/json"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -100,6 +100,21 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	tempFile.Seek(0, io.SeekStart)
 
+	aspectRatio, err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "unable to determine aspect ratio", err)
+		return
+	}
+
+	var prefix string
+	if aspectRatio == "16:9" {
+		prefix = "landscape"
+	} else if aspectRatio == "9:16" {
+		prefix = "portrait"
+	} else {
+		prefix = "other"
+	}
+
 	key := make([]byte, 32)
 	_, err = rand.Read(key)
 	if err != nil {
@@ -116,9 +131,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	prefixFileString := prefix + "/" + fileString
+
 	_, err = cfg.s3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
-		Key:         aws.String(fileString),
+		Key:         aws.String(prefixFileString),
 		Body:        tempFile,
 		ContentType: aws.String("video/mp4"),
 	})
@@ -128,7 +145,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	videoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, fileString)
+	videoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, prefixFileString)
 
 	videoMetaData.VideoURL = &videoURL
 	err = cfg.db.UpdateVideo(videoMetaData)
@@ -159,8 +176,18 @@ func getVideoAspectRatio(filePath string) (string, error) {
 	if len(output.Streams) == 0 {
 		return "", fmt.Errorf("no streams found in the video")
 	}
-	
+
 	width := output.Streams[0].Width
 	height := output.Streams[0].Height
+
+	ratio := float64(width) / float64(height)
+
+	if ratio >= 1.7 && ratio <= 1.8 {
+		return "16:9", nil
+	} else if ratio >= 0.55 && ratio <= 0.57 {
+		return "9:16", nil
+	} else {
+		return "other", nil
+	}
 
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
+	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 	"github.com/google/uuid"
 )
 
@@ -170,7 +171,13 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, videoMetaData)
+	signedVideoMetaData, err := cfg.dbVideoToSignedVideo(videoMetaData)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "failed to generate signed URL", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, signedVideoMetaData)
 }
 
 func getVideoAspectRatio(filePath string) (string, error) {
@@ -235,7 +242,7 @@ func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime ti
 }
 
 func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	videoInfo := strings.Split(video.VideoURL, ",")
+	videoInfo := strings.Split(*video.VideoURL, ",")
 	bucket := videoInfo[0]
 	key := videoInfo[1]
 
@@ -244,7 +251,7 @@ func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video
 		return video, err
 	}
 
-	video.VideoURL = presignedURL
+	video.VideoURL = &presignedURL
 
 	return video, nil
 }
